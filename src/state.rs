@@ -5,7 +5,7 @@ use hyper::{Body, Request, Response};
 //use serde_json::{Value};
 use url::Url;
 use serde::{Deserialize, Serialize};
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, SecondsFormat};
 
 use crate::create_https_client;
 use crate::error::Error as RestError;
@@ -14,7 +14,7 @@ type BoxResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Data{
-    array: Vec<Inner>
+    data: Vec<Inner>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,7 +49,7 @@ impl State {
             });
 
         let client = create_https_client(timeout)?;
-        let url = opts.value_of("org").unwrap().parse().expect("Could not parse url");
+        let url = opts.value_of("url").unwrap().parse().expect("Could not parse url");
 
         Ok(State {
             client,
@@ -58,16 +58,17 @@ impl State {
     }
 
     pub async fn get_clusters(&self) -> Result<Data, RestError> {
-        let hour_ago = Utc::now() + Duration::hours(1);
-        let path = format!("{}/charts?=from", hour_ago);
+        let hour_ago = Utc::now() - Duration::hours(1);
+        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
-        let value : Data = serde_json::from_slice(&bytes)?;
+        let value: Data = serde_json::from_slice(&bytes)?;
         Ok(value)
     }
 
     pub async fn get(&self, path: &str) -> Result<Response<Body>, RestError> {
         let uri = format!("{}/{}", &self.url, path);
+        log::debug!("getting url {}", &uri);
         let req = Request::builder()
             .method("GET")
             .uri(&uri)
@@ -103,13 +104,16 @@ impl State {
     pub async fn get_metrics(&self) -> Result<(), RestError> {
         let body = self.get_clusters().await?;
         log::debug!("response: {:?}", body);
+
+        // We should only get one array item back, since the timeframe is just one hour
+        let inner = &body.data[0];
         
-        for cluster in &body.array[0].values {
+        for cluster in &inner.values {
             let labels = [
                 ("id", cluster.id.clone()),
                 ("name", cluster.name.clone()),
             ];
-            metrics::gauge!("elastic_billing_exporter_hourly_cost", cluster.value.clone(), &labels);
+            metrics::gauge!("elastic_billing_hourly_rate", cluster.value.clone(), &labels);
         }
         Ok(())
     }
