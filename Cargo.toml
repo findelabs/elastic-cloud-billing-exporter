@@ -1,7 +1,7 @@
 [package]
-name = "atlas-exporter"
-version = "0.0.9"
-description = "atlas-exporter"
+name = "elastic-cloud-billing-exporter"
+version = "0.0.1"
+description = "elastic-cloud-billing-exporter"
 edition = "2021"
 
 [dependencies]
