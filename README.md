@@ -1,1 +1,1 @@
-# Atlas Exporter
+# Elastic Cloud Billing Exporter
