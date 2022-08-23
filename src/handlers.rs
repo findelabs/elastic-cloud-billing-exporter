@@ -38,7 +38,7 @@ pub async fn help() -> Json<Value> {
     log::info!("{{\"fn\": \"help\", \"method\":\"get\"}}");
     let payload = json!({"paths": {
             "/health": "Get the health of the api",
-            "/metrics": "Get Atlas metrics",
+            "/metrics": "Get Elastic Billing Metrics",
             "/help": "Show this help message"
         }
     });
