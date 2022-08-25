@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{Utc, SecondsFormat};
 use chrono::Datelike;
 use chrono::TimeZone;
+use chrono::Duration;
 
 use crate::create_https_client;
 use crate::error::Error as RestError;
@@ -92,9 +93,7 @@ impl State {
         })
     }
 
-    pub async fn get_clusters(&self) -> Result<DataV2, RestError> {
-        //let hour_ago = Utc::now() - Duration::hours(1);
-
+    pub async fn get_deployments(&self) -> Result<DataV2, RestError> {
         let now = Utc::now();
         let month_start = Utc.ymd(now.year(), now.month(), 1).and_hms(0,0,0);
 
@@ -102,6 +101,15 @@ impl State {
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
         let value: DataV2 = serde_json::from_slice(&bytes)?;
+        Ok(value)
+    }
+
+    pub async fn get_charts(&self) -> Result<Data, RestError> {
+        let hour_ago = Utc::now() - Duration::hours(1);
+        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let body = self.get(&path).await?;
+        let bytes = hyper::body::to_bytes(body.into_body()).await?;
+        let value: Data = serde_json::from_slice(&bytes)?;
         Ok(value)
     }
 
@@ -141,19 +149,28 @@ impl State {
     }
 
     pub async fn get_metrics(&self) -> Result<(), RestError> {
-        let body = self.get_clusters().await?;
-        log::debug!("response: {:?}", body);
+        let deployments = self.get_deployments().await?;
+        log::debug!("deployments: {:?}", deployments);
 
-        // We should only get one array item back, since the timeframe is just one hour
-        let inner = &body.deployments;
-        
-        for deployment in inner {
+        let charts = self.get_charts().await?;
+        log::debug!("charts: {:?}", charts);
+
+        // Get hourly data
+        for cluster in &charts.data[0].values {
+            let labels = [
+                ("id", cluster.id.clone()),
+                ("name", cluster.name.clone()),
+            ];
+            metrics::gauge!("elastic_billing_hourly_rate", cluster.value.clone(), &labels);
+        }
+
+        // Get monthly data
+        for deployment in &deployments.deployments {
             let labels = [
                 ("id", deployment.deployment_id.clone()),
                 ("name", deployment.deployment_name.clone()),
             ];
             metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
-            metrics::gauge!("elastic_billing_hourly_rate", deployment.hourly_rate.clone(), &labels);
 
             for item in &deployment.costs.dimensions {
                 let labels = [

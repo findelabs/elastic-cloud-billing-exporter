@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "elastic-cloud-billing-exporter"
-version = "0.0.1"
+version = "0.0.3"
 dependencies = [
  "axum 0.5.1",
  "axum-extra",
