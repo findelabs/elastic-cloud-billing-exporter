@@ -153,6 +153,17 @@ impl State {
                 ("name", deployment.deployment_name.clone()),
             ];
             metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
+            metrics::gauge!("elastic_billing_hourly_rate", deployment.hourly_rate.clone(), &labels);
+
+            for item in &deployment.costs.dimensions {
+                let labels = [
+                    ("id", deployment.deployment_id.clone()),
+                    ("name", deployment.deployment_name.clone()),
+                    ("item", item.r#type.clone()),
+                ];
+                metrics::gauge!("elastic_billing_itemized_monthly_cost_total", item.cost.clone(), &labels);
+            }
+
         }
         Ok(())
     }
