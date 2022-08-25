@@ -1,6 +1,6 @@
 [package]
 name = "elastic-cloud-billing-exporter"
-version = "0.0.1"
+version = "0.0.3"
 description = "elastic-cloud-billing-exporter"
 edition = "2021"
 
