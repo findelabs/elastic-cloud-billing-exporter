@@ -5,12 +5,47 @@ use hyper::{Body, Request, Response};
 //use serde_json::{Value};
 use url::Url;
 use serde::{Deserialize, Serialize};
-use chrono::{Duration, Utc, SecondsFormat};
+use chrono::{Utc, SecondsFormat};
+use chrono::Datelike;
+use chrono::TimeZone;
 
 use crate::create_https_client;
 use crate::error::Error as RestError;
 
 type BoxResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DataV2 {
+    total_cost: f64,
+    deployments: Vec<Deployment>
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Deployment {
+    deployment_id: String,
+    deployment_name: String,
+    costs: Cost,
+    hourly_rate: f64,
+    period: Period
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Cost {
+    total: f64,
+    dimensions: Vec<Item>
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Item {
+    r#type: String,
+    cost: f64
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Period {
+    start: String,
+    end: String
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Data{
@@ -57,12 +92,16 @@ impl State {
         })
     }
 
-    pub async fn get_clusters(&self) -> Result<Data, RestError> {
-        let hour_ago = Utc::now() - Duration::hours(1);
-        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
+    pub async fn get_clusters(&self) -> Result<DataV2, RestError> {
+        //let hour_ago = Utc::now() - Duration::hours(1);
+
+        let now = Utc::now();
+        let month_start = Utc.ymd(now.year(), now.month(), 1).and_hms(0,0,0);
+
+        let path = format!("deployments?from={}", month_start.to_rfc3339_opts(SecondsFormat::Secs, true));
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
-        let value: Data = serde_json::from_slice(&bytes)?;
+        let value: DataV2 = serde_json::from_slice(&bytes)?;
         Ok(value)
     }
 
@@ -106,14 +145,14 @@ impl State {
         log::debug!("response: {:?}", body);
 
         // We should only get one array item back, since the timeframe is just one hour
-        let inner = &body.data[0];
+        let inner = &body.deployments;
         
-        for cluster in &inner.values {
+        for deployment in inner {
             let labels = [
-                ("id", cluster.id.clone()),
-                ("name", cluster.name.clone()),
+                ("id", deployment.deployment_id.clone()),
+                ("name", deployment.deployment_name.clone()),
             ];
-            metrics::gauge!("elastic_billing_hourly_rate", cluster.value.clone(), &labels);
+            metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
         }
         Ok(())
     }
