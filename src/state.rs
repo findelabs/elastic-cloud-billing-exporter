@@ -104,14 +104,14 @@ impl State {
         Ok(value)
     }
 
-//    pub async fn get_charts(&self) -> Result<Data, RestError> {
-//        let hour_ago = Utc::now() - Duration::hours(1);
-//        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
-//        let body = self.get(&path).await?;
-//        let bytes = hyper::body::to_bytes(body.into_body()).await?;
-//        let value: Data = serde_json::from_slice(&bytes)?;
-//        Ok(value)
-//    }
+    pub async fn get_charts(&self) -> Result<Data, RestError> {
+        let hour_ago = Utc::now() - Duration::hours(1);
+        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let body = self.get(&path).await?;
+        let bytes = hyper::body::to_bytes(body.into_body()).await?;
+        let value: Data = serde_json::from_slice(&bytes)?;
+        Ok(value)
+    }
 
     pub async fn get(&self, path: &str) -> Result<Response<Body>, RestError> {
         let uri = format!("{}/{}", &self.url, path);
@@ -152,17 +152,18 @@ impl State {
         let deployments = self.get_deployments().await?;
         log::debug!("deployments: {:?}", deployments);
 
-//        let charts = self.get_charts().await?;
-//        log::debug!("charts: {:?}", charts);
-//
-//        // Get hourly data
-//        for cluster in &charts.data[0].values {
-//            let labels = [
-//                ("id", cluster.id.clone()),
-//                ("name", cluster.name.clone()),
-//            ];
-//            metrics::gauge!("elastic_billing_hourly_rate", cluster.value.clone(), &labels);
-//        }
+        let charts = self.get_charts().await?;
+        log::debug!("charts: {:?}", charts);
+
+        // Get hourly data
+        for cluster in &charts.data[0].values {
+            let labels = [
+                ("id", cluster.id.clone()),
+                ("name", cluster.name.clone()),
+            ];
+            log::debug!("Adding metric: elastic_billing_hourly_rate, labels: {:?}, value: {}", &labels, cluster.value.clone());
+            metrics::gauge!("elastic_billing_hourly_rate", cluster.value.clone(), &labels);
+        }
 
         // Get monthly data
         for deployment in &deployments.deployments {
@@ -170,6 +171,7 @@ impl State {
                 ("id", deployment.deployment_id.clone()),
                 ("name", deployment.deployment_name.clone()),
             ];
+            log::debug!("Adding metric: elastic_billing_monthly_cost_total, labels: {:?}, value: {}", &labels, deployment.costs.total.clone());
             metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
 
             for item in &deployment.costs.dimensions {
@@ -178,6 +180,7 @@ impl State {
                     ("name", deployment.deployment_name.clone()),
                     ("item", item.r#type.clone()),
                 ];
+                log::debug!("Adding metric: elastic_billing_itemized_monthly_cost_total, labels: {:?}, value: {}", &labels, item.cost.clone());
                 metrics::gauge!("elastic_billing_itemized_monthly_cost_total", item.cost.clone(), &labels);
             }
 
