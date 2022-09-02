@@ -105,8 +105,9 @@ impl State {
     }
 
     pub async fn get_charts(&self) -> Result<Data, RestError> {
+        let now = Utc::now();
         let hour_ago = Utc::now() - Duration::hours(1);
-        let path = format!("charts?from={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let path = format!("charts?from={}&to={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true), now.to_rfc3339_opts(SecondsFormat::Secs, true));
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
         let value: Data = serde_json::from_slice(&bytes)?;
@@ -173,6 +174,10 @@ impl State {
             ];
             log::debug!("Adding metric: elastic_billing_monthly_cost_total, labels: {:?}, value: {}", &labels, deployment.costs.total.clone());
             metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
+
+
+            log::debug!("Adding metric: elastic_billing_monthly_hourly_rate, labels: {:?}, value: {}", &labels, deployment.hourly_rate.clone());
+            metrics::gauge!("elastic_billing_monthly_hourly_rate", deployment.hourly_rate.clone(), &labels);
 
             for item in &deployment.costs.dimensions {
                 let labels = [
