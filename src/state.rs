@@ -91,11 +91,22 @@ impl State {
         })
     }
 
-    pub async fn get_deployments(&self) -> Result<DataV2, RestError> {
+    pub async fn get_deployments_by_day(&self) -> Result<DataV2, RestError> {
         let now = Utc::now();
-        let day_start = Utc.ymd(now.year(), now.month(), now.day()).and_hms(0,0,0);
+        let start = Utc.ymd(now.year(), now.month(), now.day()).and_hms(0,0,0);
 
-        let path = format!("deployments?from={}", day_start.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let path = format!("deployments?from={}", start.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let body = self.get(&path).await?;
+        let bytes = hyper::body::to_bytes(body.into_body()).await?;
+        let value: DataV2 = serde_json::from_slice(&bytes)?;
+        Ok(value)
+    }
+
+    pub async fn get_deployments_by_month(&self) -> Result<DataV2, RestError> {
+        let now = Utc::now();
+        let start = Utc.ymd(now.year(), now.month(), 1).and_hms(0,0,0);
+
+        let path = format!("deployments?from={}", start.to_rfc3339_opts(SecondsFormat::Secs, true));
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
         let value: DataV2 = serde_json::from_slice(&bytes)?;
@@ -148,8 +159,10 @@ impl State {
     }
 
     pub async fn get_metrics(&self) -> Result<(), RestError> {
-        let deployments = self.get_deployments().await?;
-        log::debug!("deployments: {:?}", deployments);
+        let deployments_day = self.get_deployments_by_day().await?;
+        log::debug!("day deployments: {:?}", deployments_day);
+        let deployments_month = self.get_deployments_by_month().await?;
+        log::debug!("monthly deployments: {:?}", deployments_month);
 
 //        let charts = self.get_charts().await?;
 //        log::debug!("charts: {:?}", charts);
@@ -164,15 +177,14 @@ impl State {
 //            metrics::gauge!("elastic_billing_daily_cost_total", cluster.value.clone(), &labels);
 //        }
 
-        // Get monthly data
-        for deployment in &deployments.deployments {
+        // Get daily data
+        for deployment in &deployments_day.deployments {
             let labels = [
                 ("id", deployment.deployment_id.clone()),
                 ("name", deployment.deployment_name.clone()),
             ];
             log::debug!("Adding metric: elastic_billing_daily_cost_total, labels: {:?}, value: {}", &labels, deployment.costs.total.clone());
             metrics::gauge!("elastic_billing_daily_cost_total", deployment.costs.total.clone(), &labels);
-
 
             log::debug!("Adding metric: elastic_billing_hourly_rate, labels: {:?}, value: {}", &labels, deployment.hourly_rate.clone());
             metrics::gauge!("elastic_billing_hourly_rate", deployment.hourly_rate.clone(), &labels);
@@ -185,6 +197,29 @@ impl State {
                 ];
                 log::debug!("Adding metric: elastic_billing_itemized_daily_cost_total, labels: {:?}, value: {}", &labels, item.cost.clone());
                 metrics::gauge!("elastic_billing_itemized_daily_cost_total", item.cost.clone(), &labels);
+            }
+        }
+
+        // Get monthly data
+        for deployment in &deployments_month.deployments {
+            let labels = [
+                ("id", deployment.deployment_id.clone()),
+                ("name", deployment.deployment_name.clone()),
+            ];
+            log::debug!("Adding metric: elastic_billing_monthly_cost_total, labels: {:?}, value: {}", &labels, deployment.costs.total.clone());
+            metrics::gauge!("elastic_billing_monthly_cost_total", deployment.costs.total.clone(), &labels);
+
+            log::debug!("Adding metric: elastic_billing_monthly_hourly_rate, labels: {:?}, value: {}", &labels, deployment.hourly_rate.clone());
+            metrics::gauge!("elastic_billing_monthly_hourly_rate", deployment.hourly_rate.clone(), &labels);
+
+            for item in &deployment.costs.dimensions {
+                let labels = [
+                    ("id", deployment.deployment_id.clone()),
+                    ("name", deployment.deployment_name.clone()),
+                    ("item", item.r#type.clone()),
+                ];
+                log::debug!("Adding metric: elastic_billing_itemized_monthly_cost_total, labels: {:?}, value: {}", &labels, item.cost.clone());
+                metrics::gauge!("elastic_billing_itemized_monthly_cost_total", item.cost.clone(), &labels);
             }
 
         }
