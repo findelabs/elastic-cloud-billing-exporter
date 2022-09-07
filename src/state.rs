@@ -2,13 +2,11 @@ use crate::https::HttpsClient;
 use clap::ArgMatches;
 use std::error::Error;
 use hyper::{Body, Request, Response};
-//use serde_json::{Value};
 use url::Url;
 use serde::{Deserialize, Serialize};
 use chrono::{Utc, SecondsFormat};
 use chrono::Datelike;
 use chrono::TimeZone;
-use chrono::Duration;
 
 use crate::create_https_client;
 use crate::error::Error as RestError;
@@ -106,8 +104,8 @@ impl State {
 
     pub async fn get_charts(&self) -> Result<Data, RestError> {
         let now = Utc::now();
-        let hour_ago = Utc::now() - Duration::hours(1);
-        let path = format!("charts?from={}&to={}", hour_ago.to_rfc3339_opts(SecondsFormat::Secs, true), now.to_rfc3339_opts(SecondsFormat::Secs, true));
+        let day_start = Utc.ymd(now.year(), now.month(), now.day()).and_hms(0,0,0);
+        let path = format!("charts?from={}", day_start.to_rfc3339_opts(SecondsFormat::Secs, true));
         let body = self.get(&path).await?;
         let bytes = hyper::body::to_bytes(body.into_body()).await?;
         let value: Data = serde_json::from_slice(&bytes)?;
