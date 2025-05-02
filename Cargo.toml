@@ -28,4 +28,4 @@ metrics = "0.18"
 metrics-util = "0.12"
 metrics-exporter-prometheus = "0.9"
 axum-extra = "0.1"
-futures = { version = "0.3.4", default-features = false, features = ["async-await"] }
+futures = { version = "0.3", default-features = false, features = ["async-await"] }
