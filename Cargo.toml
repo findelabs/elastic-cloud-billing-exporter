@@ -27,7 +27,7 @@ url = { version = "2", features = ["serde"] }
 metrics = "0.18"
 metrics-util = "0.12"
 metrics-exporter-prometheus = "0.9"
-axum-extra = "0.1"
+axum-extra = "0.10"
 futures = { version = "0.3", default-features = false, features = ["async-await"] }
 thiserror = "1.0.59"
 tracing-opentelemetry = "0.23.0"
