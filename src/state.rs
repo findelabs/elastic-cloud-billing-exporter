@@ -2,7 +2,6 @@ use crate::https::HttpsClient;
 use chrono::Datelike;
 use chrono::TimeZone;
 use chrono::{SecondsFormat, Utc};
-use clap::ArgMatches;
 use hyper::{Body, Request, Response};
 use serde::{Deserialize, Serialize};
 use std::error::Error;

@@ -1,14 +1,8 @@
-use axum::{
-    extract::Extension,
-    middleware,
-    routing::{get, post},
-    Router,
-};
+use axum::{extract::Extension, middleware, routing::get, Router};
 use chrono::Local;
 use clap::Parser;
 use env_logger::{Builder, Target};
 use log::LevelFilter;
-use std::future::ready;
 use std::io::Write;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -21,7 +15,7 @@ mod https;
 mod metrics;
 mod state;
 
-use crate::metrics::{setup_metrics_recorder, track_metrics};
+use crate::metrics::track_metrics;
 use handlers::{handler_404, health, help, metrics, root};
 use https::create_https_client;
 use state::State;
@@ -76,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state = State::new(args.clone()).await?;
 
     // Create prometheus handle
-    let recorder_handle = setup_metrics_recorder();
+    // let recorder_handle = setup_metrics_recorder();
 
     // These should be authenticated
     let base = Router::new().route("/", get(root));
@@ -85,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let standard = Router::new()
         .route("/health", get(health))
         .route("/help", get(help))
-        .route("/metrics", get(move || ready(recorder_handle.render())));
+        .route("/metrics", get(metrics));
 
     let app = Router::new()
         .merge(base)
