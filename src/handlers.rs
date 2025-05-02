@@ -1,13 +1,13 @@
 use axum::{
-    extract::{OriginalUri, Extension},
+    extract::{Extension, OriginalUri},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use clap::{crate_description, crate_name, crate_version};
+use metrics_exporter_prometheus::PrometheusHandle;
 use serde_json::json;
 use serde_json::Value;
-use metrics_exporter_prometheus::PrometheusHandle;
 
 use crate::error::Error as RestError;
 use crate::State;
@@ -16,7 +16,10 @@ use crate::State;
 #[derive(Debug)]
 pub struct RequestMethod(pub hyper::Method);
 
-pub async fn metrics(Extension(recorder_handle): Extension<PrometheusHandle>, Extension(state): Extension<State>) -> Result<String, RestError> {
+pub async fn metrics(
+    Extension(recorder_handle): Extension<PrometheusHandle>,
+    Extension(state): Extension<State>,
+) -> Result<String, RestError> {
     log::info!("{{\"fn\": \"metrics\", \"method\":\"get\"}}");
     state.get_metrics().await?;
     Ok(recorder_handle.render())
